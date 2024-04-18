@@ -1,6 +1,6 @@
 from transformers import AutoTokenizer, pipeline, AutoModelForSeq2SeqLM
 import re
-import json
+import os
 
 
 # Load the tokenizer and model
@@ -28,9 +28,6 @@ def preprocess_text(text):
 
 model_id = 'google/flan-t5-base'
 tokenizer, model = load_model(model_id)
-
-file_path = "/Users/koshevv1/Python/Law_Insider_digipathinc_nondisclosure-agreement_Filed_18-12-2014_Contract.txt"
-document_text = read_document(file_path)
 
 
 ############ CHUNKING
@@ -62,24 +59,11 @@ def chunk_text_optimally(text, tokenizer, max_tokens=450):
     # Add the last chunk
     if current_chunk:
         chunks.append(current_chunk)
-    
+ 
     return chunks
-
-chunks = chunk_text_optimally(document_text, tokenizer)
-
-# Checking chunking results
-print(f"Number of chunks: {len(chunks)}")
-
-for i, chunk in enumerate(chunks, start=1):
-    print(f"Chunk {i}: {chunk}") 
-    print("--------------------------------------------------\n")
-
-
 
 
 ###### SUMMARIZATION
-
-###### Summarization 1
 
 summarization_pipeline = pipeline("summarization", model=model,tokenizer=tokenizer, max_length=512)
 
@@ -94,111 +78,118 @@ def summarize_text(text, summarization_pipeline):
     summary = summarization_pipeline(input, max_length=200, min_length=50, do_sample=False, truncation=True)
     return summary[0]['summary_text']
 
-# Summarizing each chunk with the concise prompt
-summaries = []
-for i, text_chunk in enumerate(chunks):
-    try:
-        summary = summarize_text(text_chunk, summarization_pipeline)
-        summaries.append((i+1, summary))  # Storing chunk number and summary
-    except Exception as e:
-        print(f"Error summarizing chunk {i+1} with concise prompt: {e}")
-        summaries.append((i+1, "Summarization failed."))
 
-# Displaying the structured summaries
-for chunk_number, summary in summaries:
-    print(f"Chunk {chunk_number} Summary:\n{summary}\n")
-    print("--------------------------------------------------\n")
+## Post-processing
 
-
-
-
-
-###### Summarization 2
-
-# Without prompt, bad output
-summaries = []
-for i, chunk in enumerate(chunks):
-    inputs = tokenizer.encode("summarize: " + chunk, return_tensors="pt", max_length=512, truncation=True)
-    summary_ids = model.generate(inputs, max_length=200, min_length=50, length_penalty=2.0, num_beams=4, early_stopping=True)
-
-    # Decode and output the summary
-    summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-    summaries.append((i+1, summary))
-    print(f"Original Text for Chunk {i+1}:")
-    print(chunk)
-    print(f"\nSummary for Chunk {i+1}:")
-    print(summary)
-    print("\n" + "="*50 + "\n")  # print a separator for readability
-
-
-## with prompt:
-
-prompt = (
-        "Summarise this text into a list of topics."
-        "Enumerate each topic."
-)
-
-summaries = []
-for i, chunk in enumerate(chunks):
-    inputs = tokenizer.encode(prompt + " " + chunk, return_tensors="pt", max_length=512, truncation=True)
-    summary_ids = model.generate(inputs, max_length=150, min_length=50, length_penalty=2.0, num_beams=4, early_stopping=True)
-
-    # Decode and output the summary
-    summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-    summaries.append((i+1, summary))
-    print(f"Original Text for Chunk {i+1}:")
-    print(chunk)
-    print(f"\nSummary for Chunk {i+1}:")
-    print(summary)
-    print("\n" + "="*50 + "\n")  # print a separator for readability
-
-
-
-###### Post-processing
-
-
-
-# Removing duplicate topics
-
-# Combining all summaries into a long list
-combined_summaries = []
-for chunk_number, summary in summaries:
-    combined_summaries.append(summary)
-
-combined_summaries_text = ". ".join(combined_summaries)
-
-
-prompt = "From this list of topics, remove duplicate topics."
-    
-inputs_final_summary = tokenizer.encode(prompt + " " + combined_summaries_text, return_tensors="pt", max_length=512, truncation=True)
-summary_ids_of_final = model.generate(inputs_final_summary, max_length=500, min_length=150, length_penalty=2.0, num_beams=4, early_stopping=True)
-
-# Decode and output the summary
-final_summary = tokenizer.decode(summary_ids_of_final[0], skip_special_tokens=True)
-print("Final Summary:")
-print(final_summary)
-
-
-# Split the text on occurrences of number followed by a dot and a space
-items = re.split(r'\s(?=\d+\.\s)', final_summary)
-
-# Remove the numbers and trim whitespace
-cleaned_items = [re.sub(r'^\d+\.\s', '', item).strip() for item in items]
-
-print(cleaned_items)
-
-
-
-
+def extract_entries(text):
+    # This regex looks for sequences of non-digit characters that are preceded by a number and a dot
+    # and followed by another number and a dot, or the end of the string.
+    pattern = r'\d+\.\s*(.*?)\s*(?=\d+\.|$)'
+    entries = re.findall(pattern, text)
+    return entries
 
    
+### Counting topics
+
+# All topics from all files
+all_topics = {} 
+
+def count_topics(lists):
+    for list_item in lists:
+        # Normalize the topic name to ensure consistent counting
+        topic = list_item.strip().lower()
+        if topic.endswith('.'):
+            topic = topic[:-1]
+
+        if topic in all_topics:
+            all_topics[topic] += 1
+        else:
+            all_topics[topic] = 1
+
+
+############ Processing of the files  ############
+
+file_paths = ["/Users/koshevv1/Python/Contract-analysis-with-LLM/NDA1.txt", 
+              "/Users/koshevv1/Python/Contract-analysis-with-LLM/NDA2.txt"]
+
+
+for file_path in file_paths:
+    document_text = read_document(file_path)
+    if document_text is None:
+        continue
+
+    ## Chunking
+    chunks = chunk_text_optimally(document_text, tokenizer)
+    
+    # Checking chunking results
+    print(f"Number of chunks: {len(chunks)}")
+
+    for i, chunk in enumerate(chunks, start=1):
+        print(f"Chunk {i}: {chunk}") 
+        print("--------------------------------------------------\n")
+
+
+    ## Summarizing each chunk with the concise prompt
+    summaries = []
+    for i, text_chunk in enumerate(chunks):
+        try:
+            summary = summarize_text(text_chunk, summarization_pipeline)
+            summaries.append((i+1, summary))  # Storing chunk number and summary
+        except Exception as e:
+            print(f"Error summarizing chunk {i+1} with concise prompt: {e}")
+            summaries.append((i+1, "Summarization failed."))
+
+    # Displaying the structured summaries
+    for chunk_number, summary in summaries:
+        print(f"Chunk {chunk_number} Summary:\n{summary}\n")
+        print("--------------------------------------------------\n")
+
+    ###### Post-processing
+
+    # Combining all summaries into a long list
+    combined_summaries = []
+    for chunk_number, summary in summaries:
+        if not re.match(r'^\d+\.\s', summary):
+            summary = '1. ' + summary
+        combined_summaries.append(summary)
+
+    combined_summaries_text = ". ".join(combined_summaries)
+
+
+    prompt = ("In this list of topics, many are repeated or synonymous."
+            "Remove repeated terms and synonymous, so that each concept is represented uniquely without repetition." 
+            "Do not simplify them to Nondisclosure agreement or NDA, and do not incude any numbers."
+        )
+
+    inputs_final_summary = tokenizer.encode(prompt + " " + combined_summaries_text, return_tensors="pt", max_length=512, truncation=True)
+    summary_ids_of_final = model.generate(inputs_final_summary, max_length=500, min_length=150, length_penalty=2.0, num_beams=4, early_stopping=True)
+
+    # Decode and output the summary
+    final_summary = tokenizer.decode(summary_ids_of_final[0], skip_special_tokens=True)
+    print("Final Summary:")
+    print(final_summary)
+
+
+    final_list = extract_entries(final_summary)
+    print("Final List of topics as list:")
+    print(final_list)
+
+    count_topics(final_list)
+
+
+
+# Optionally, to convert this to JSON format:
+import json
+json_output = json.dumps(all_topics, indent=4)
+print(json_output)
 
 
 
 ##############################################
 
+#For the future:
 
-
-
+## Keep count on how many documents were processed (len(file_paths)) -> to calculate most common topics
+## -> From final topic count, remove those that are present only in 1 or 2 documents (mistakes in summarization, e.g. company names)
 
 
