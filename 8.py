@@ -81,8 +81,10 @@ def summarize_text(text, summarization_pipeline):
         ## "List the main topics covered in this text, numbering each topic. For each topic, extract its main content in the form of key clauses or statements. Do not provide a coherent summary, but list each statement separately."
         # "Desired structure: '1. Topic Name: Key Clause 1. Key Clause 2.', '2. Topic Name: Key Clause 1. Key Clause 2.'"
         # "Example: 1. No license: All confidential information remain in the sole property of the Discloser. Nothing in this NDA is intended to grant Recipient any rights under any patent. Recipient shall not derive any source code or other objects that embody the confidential information of the Discloser."
+        #f"Text to analyse: {text}"
     )
     input = prompt + text
+    #input = prompt
     summary = summarization_pipeline(input, max_length=200, min_length=50, do_sample=False, truncation=True)
     return summary[0]['summary_text']
 
