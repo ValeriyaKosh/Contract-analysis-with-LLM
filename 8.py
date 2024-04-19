@@ -70,9 +70,17 @@ summarization_pipeline = pipeline("summarization", model=model,tokenizer=tokeniz
 def summarize_text(text, summarization_pipeline):
     # Refined prompt with an emphasis on brevity and structure
     prompt = (
-        "Create a list of all main topics covered in this text, for each topic, describe it with one concise sentence."
-        "Enumerate each topic. Focus on short, clear descriptions. "
-        "Example: '1. Topic Name: Short Description.', '2. Topic Name: Short Description.'"
+       "Create a list of all main topics covered in this text, for each topic, describe it with one concise sentence."
+       "Enumerate each topic. Focus on short, clear descriptions. "
+       "Example: '1. Topic Name: Short Description.', '2. Topic Name: Short Description.'"
+       # "List all the main topics covered in this text. Enumerate each topic and provide only the names, without descriptions or details."
+       
+       # Prompt for topic-fingerprinting:
+       # "for each main topic in [list, prob final_summary], extract its main content from [file]. Do not produce coherent summary, but instead create a list of main clauses for each topic."
+
+        ## "List the main topics covered in this text, numbering each topic. For each topic, extract its main content in the form of key clauses or statements. Do not provide a coherent summary, but list each statement separately."
+        # "Desired structure: '1. Topic Name: Key Clause 1. Key Clause 2.', '2. Topic Name: Key Clause 1. Key Clause 2.'"
+        # "Example: 1. No license: All confidential information remain in the sole property of the Discloser. Nothing in this NDA is intended to grant Recipient any rights under any patent. Recipient shall not derive any source code or other objects that embody the confidential information of the Discloser."
     )
     input = prompt + text
     summary = summarization_pipeline(input, max_length=200, min_length=50, do_sample=False, truncation=True)
@@ -158,7 +166,7 @@ for file_path in file_paths:
 
     prompt = ("In this list of topics, many are repeated or synonymous."
             "Remove repeated terms and synonymous, so that each concept is represented uniquely without repetition." 
-            "Do not simplify them to Nondisclosure agreement or NDA, and do not incude any numbers."
+            "Do not simplify them to Nondisclosure agreement or NDA, and do not include any numbers."
         )
 
     inputs_final_summary = tokenizer.encode(prompt + " " + combined_summaries_text, return_tensors="pt", max_length=512, truncation=True)
@@ -191,5 +199,5 @@ print(json_output)
 
 ## Keep count on how many documents were processed (len(file_paths)) -> to calculate most common topics
 ## -> From final topic count, remove those that are present only in 1 or 2 documents (mistakes in summarization, e.g. company names)
-
+# - put topics in the order (most common first)
 
