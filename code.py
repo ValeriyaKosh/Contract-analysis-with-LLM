@@ -26,7 +26,7 @@ def preprocess_text(text):
     return text
 
 
-model_id = 'google/flan-t5-base'
+????????? model_id = 'google/flan-t5-base'
 tokenizer, model = load_model(model_id)
 
 
@@ -119,7 +119,7 @@ def count_topics(lists):
 
 ############ Processing of the files  ############
 
-file_paths = ["/Users/koshevv1/Python/Contract-analysis-with-LLM/NDA1.txt", 
+????? file_paths = ["/Users/koshevv1/Python/Contract-analysis-with-LLM/NDA1.txt", 
               "/Users/koshevv1/Python/Contract-analysis-with-LLM/NDA2.txt"]
 
 
@@ -187,6 +187,10 @@ for file_path in file_paths:
     count_topics(final_list)
 
 
+print("Grand Final Output:")
+print(all_topics)
+
+
 
 # Optionally, to convert this to JSON format:
 import json
@@ -199,7 +203,16 @@ print(json_output)
 
 #For the future:
 
-## Keep count on how many documents were processed (len(file_paths)) -> to calculate most common topics
-## -> From final topic count, remove those that are present only in 1 or 2 documents (mistakes in summarization, e.g. company names)
-# - put topics in the order (most common first)
+## Keep count on how many documents were processed (len(file_paths)) -> to calculate most common topics (%)
+## -> From final topic list (after analysing 20+documents), remove those that are present only in 1 or 2 documents (mistakes in summarization, e.g. company names)
+# - put topics in the order from most to least common
+
+
+##### Fingerprint of each topic? Could it be done when summarising using prompt? 
+## Then need to change: change max length in summarization, extract entries -> Main topic between 'number.' and ':' each clause until next '.' new topic when new number starts.
+# count_topics to count main topics, may need similar thing for each clause within a topic? 
+# combining_summaries and removing dublicates should be only about main topics. -> need to extract them from summaries first.
+# Or, always after analysing new document somehow check that new topics and clauses aren't synonyms of the ones already discovered -> then need to be done for both
+
+
 
